@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Service</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+        }
+        #chat-container {
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        .message {
+            margin: 0.5rem;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            max-width: 70%;
+        }
+        .sent {
+            background-color: #DCF8C6;
+            margin-left: auto;
+        }
+        .received {
+            background-color: #E5E7EB;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center h-screen">
+    <!-- Login Page -->
+    <div id="login-page" class="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
+        <h1 class="text-2xl font-bold mb-6 text-center">Join Chat</h1>
+        <div class="mb-4">
+            <label for="username" class="block text-sm font-medium text-gray-700">Username</label>
+            <input type="text" id="username" class="mt-1 p-2 w-full border rounded-md" placeholder="Enter your username" required>
+        </div>
+        <div class="mb-4">
+            <label for="chatRoomId" class="block text-sm font-medium text-gray-700">Chat Room ID</label>
+            <input type="text" id="chatRoomId" class="mt-1 p-2 w-full border rounded-md" placeholder="Enter chat room ID" value="general" required>
+        </div>
+        <button onclick="joinChat()" class="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700">Join Chat</button>
+    </div>
+
+    <!-- Chat Page -->
+    <div id="chat-page" class="hidden bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl flex flex-col h-[90vh]">
+        <h1 class="text-2xl font-bold mb-4">Chat Room: <span id="room-name"></span></h1>
+        <div id="chat-container" class="flex-1 bg-gray-50 p-4 rounded-md mb-4">
+            <div id="messages"></div>
+        </div>
+        <div class="flex">
+            <input type="text" id="message-input" class="flex-1 p-2 border rounded-l-md" placeholder="Type your message..." onkeypress="if(event.key === 'Enter') sendMessage()">
+            <button onclick="sendMessage()" class="bg-blue-600 text-white p-2 rounded-r-md hover:bg-blue-700">Send</button>
+        </div>
+    </div>
+
+    <script>
+        let stompClient = null;
+        let username = '';
+        let chatRoomId = '';
+
+        function joinChat() {
+            username = document.getElementById('username').value.trim();
+            chatRoomId = document.getElementById('chatRoomId').value.trim();
+            if (!username || !chatRoomId) {
+                alert('Please enter a username and chat room ID');
+                return;
+            }
+
+            // Hide login page, show chat page
+            document.getElementById('login-page').classList.add('hidden');
+            document.getElementById('chat-page').classList.remove('hidden');
+            document.getElementById('room-name').textContent = chatRoomId;
+
+            // Connect to WebSocket
+            connectWebSocket();
+        }
+
+        function connectWebSocket() {
+            const socket = new SockJS('http://localhost:8080/ws/chat');
+            stompClient = Stomp.over(socket);
+            stompClient.connect({}, (frame) => {
+                console.log('Connected to WebSocket:', frame);
+                // Subscribe to the room's topic
+                stompClient.subscribe(`/sub/${chatRoomId}`, (message) => {
+                    console.log('Received message:', message.body);
+                    const msg = JSON.parse(message.body);
+                    displayMessage(msg);
+                }, (error) => {
+                    console.error('Subscription error:', error);
+                });
+                // Send a join message
+                stompClient.send(`/pub/chat/join`, {}, JSON.stringify({
+                    type: 'JOIN',
+                    sender: username,
+                    content: `${username} joined the chat`,
+                    chatRoomId: chatRoomId,
+                    timestamp: new Date().toISOString()
+                }));
+            }, (error) => {
+                console.error('STOMP connection error:', error);
+                displayMessage({ sender: 'System', content: `Connection failed: ${error}`, timestamp: new Date().toISOString() });
+                // Retry connection after 5 seconds
+                setTimeout(connectWebSocket, 5000);
+            });
+
+            socket.onerror = (error) => {
+                console.error('SockJS error:', error);
+            };
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('message-input');
+            const content = input.value.trim();
+            if (!content || !stompClient) return;
+
+            const message = {
+                type: 'MESSAGE',
+                sender: username,
+                content: content,
+                chatRoomId: chatRoomId,
+                timestamp: new Date().toISOString()
+            };
+
+            stompClient.send(`/pub/chat/message`, {}, JSON.stringify(message));
+            input.value = '';
+        }
+
+        function displayMessage(message) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', message.sender === username ? 'sent' : 'received');
+            const content = message.type === 'JOIN' ? `<i>${message.content}</i>` : message.content;
+            messageDiv.innerHTML = `
+                <div class="font-bold">${message.sender}</div>
+                <div>${content}</div>
+                <div class="text-xs text-gray-500">${new Date(message.timestamp).toLocaleTimeString()}</div>
+            `;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+    </script>
+</body>
+</html>
