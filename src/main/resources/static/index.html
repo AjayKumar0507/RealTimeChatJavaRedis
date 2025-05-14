@@ -2,145 +2,447 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat Service</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Chat App</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
     <style>
         body {
-            font-family: 'Arial', sans-serif;
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
         }
-        #chat-container {
-            max-height: 70vh;
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .chat-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        input[type="text"], input[type="password"], select, button {
+            padding: 10px;
+            margin: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+            width: calc(100% - 30px);
+        }
+        select[multiple] {
+            height: 100px;
+        }
+        button {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        button:hover:not(:disabled) {
+            background-color: #218838;
+        }
+        #messages {
+            border: 1px solid #ddd;
+            padding: 10px;
+            min-height: 200px;
+            max-height: 300px;
             overflow-y: auto;
+            margin-bottom: 10px;
+            background-color: #f9f9f9;
         }
         .message {
-            margin: 0.5rem;
-            padding: 0.75rem;
-            border-radius: 0.5rem;
-            max-width: 70%;
+            padding: 5px;
+            margin: 5px 0;
+            border-radius: 4px;
         }
-        .sent {
-            background-color: #DCF8C6;
-            margin-left: auto;
+        .message.sent {
+            background-color: #d4edda;
+            text-align: right;
         }
-        .received {
-            background-color: #E5E7EB;
+        .message.received {
+            background-color: #e9ecef;
+            text-align: left;
+        }
+        #typing {
+            color: #555;
+            font-style: italic;
+        }
+        .error {
+            color: red;
+            font-size: 14px;
+        }
+        #groupCreation {
+            display: none;
+            margin-top: 10px;
+        }
+        #selectionHint {
+            font-size: 12px;
+            color: #555;
+            margin: 5px;
         }
     </style>
 </head>
-<body class="bg-gray-100 flex items-center justify-center h-screen">
-    <!-- Login Page -->
-    <div id="login-page" class="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
-        <h1 class="text-2xl font-bold mb-6 text-center">Join Chat</h1>
-        <div class="mb-4">
-            <label for="username" class="block text-sm font-medium text-gray-700">Username</label>
-            <input type="text" id="username" class="mt-1 p-2 w-full border rounded-md" placeholder="Enter your username" required>
+<body>
+    <div class="chat-container">
+        <h1>Chat Application</h1>
+        <div class="input-group">
+            <input id="username" placeholder="Enter your username" />
+            <input id="password" type="password" placeholder="Enter your password" />
+            <input id="email" placeholder="Enter your email" />
+            <button onclick="connect()">Connect</button>
         </div>
-        <div class="mb-4">
-            <label for="chatRoomId" class="block text-sm font-medium text-gray-700">Chat Room ID</label>
-            <input type="text" id="chatRoomId" class="mt-1 p-2 w-full border rounded-md" placeholder="Enter chat room ID" value="general" required>
+        <div class="input-group">
+            <button onclick="toggleGroupCreation()" id="createGroupButton" disabled>Create Group</button>
         </div>
-        <button onclick="joinChat()" class="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700">Join Chat</button>
-    </div>
-
-    <!-- Chat Page -->
-    <div id="chat-page" class="hidden bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl flex flex-col h-[90vh]">
-        <h1 class="text-2xl font-bold mb-4">Chat Room: <span id="room-name"></span></h1>
-        <div id="chat-container" class="flex-1 bg-gray-50 p-4 rounded-md mb-4">
-            <div id="messages"></div>
+        <div id="groupCreation">
+            <input id="groupName" placeholder="Enter group name" />
+            <select id="availableUsers" multiple>
+                <option value="" disabled>Select users (Hold Ctrl to select multiple)</option>
+            </select>
+            <div id="selectionHint">Hold Ctrl to select multiple users</div>
+            <button onclick="createGroup()">Create</button>
         </div>
-        <div class="flex">
-            <input type="text" id="message-input" class="flex-1 p-2 border rounded-l-md" placeholder="Type your message..." onkeypress="if(event.key === 'Enter') sendMessage()">
-            <button onclick="sendMessage()" class="bg-blue-600 text-white p-2 rounded-r-md hover:bg-blue-700">Send</button>
+        <div class="input-group">
+            <select id="recipient" disabled>
+                <option value="">Select Recipient or Group</option>
+            </select>
+            <input id="message" placeholder="Type a message" oninput="sendTyping()" disabled />
+            <button onclick="sendMessage()" disabled id="sendButton">Send</button>
         </div>
+        <div class="input-group">
+            <label><input type="checkbox" id="isGroup" disabled> Group Chat</label>
+        </div>
+        <div id="messages"></div>
+        <div id="typing"></div>
+        <div id="error" class="error"></div>
     </div>
 
     <script>
         let stompClient = null;
-        let username = '';
-        let chatRoomId = '';
+        let currentUserId = null;
 
-        function joinChat() {
-            username = document.getElementById('username').value.trim();
-            chatRoomId = document.getElementById('chatRoomId').value.trim();
-            if (!username || !chatRoomId) {
-                alert('Please enter a username and chat room ID');
+        function connect() {
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value.trim();
+            const email = document.getElementById('email').value.trim();
+
+            if (!username || !password || !email) {
+                showError('Please enter username, password, and email');
                 return;
             }
 
-            // Hide login page, show chat page
-            document.getElementById('login-page').classList.add('hidden');
-            document.getElementById('chat-page').classList.remove('hidden');
-            document.getElementById('room-name').textContent = chatRoomId;
-
-            // Connect to WebSocket
-            connectWebSocket();
+            fetch('/api/users/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username, password, email })
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.text().then(text => {
+                            throw new Error(`Registration failed: ${text} (HTTP ${response.status})`);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(user => {
+                    console.log('User registered successfully:', user);
+                    currentUserId = user.username;
+                    proceedWithConnection();
+                })
+                .catch(error => {
+                    showError(error.message);
+                    console.error('Error registering user:', error);
+                });
         }
 
-        function connectWebSocket() {
-            const socket = new SockJS('http://localhost:8080/ws/chat');
+        function proceedWithConnection() {
+            const socket = new SockJS('/chat');
             stompClient = Stomp.over(socket);
-            stompClient.connect({}, (frame) => {
-                console.log('Connected to WebSocket:', frame);
-                // Subscribe to the room's topic
-                stompClient.subscribe(`/sub/${chatRoomId}`, (message) => {
-                    console.log('Received message:', message.body);
-                    const msg = JSON.parse(message.body);
-                    displayMessage(msg);
-                }, (error) => {
-                    console.error('Subscription error:', error);
-                });
-                // Send a join message
-                stompClient.send(`/pub/chat/join`, {}, JSON.stringify({
-                    type: 'JOIN',
-                    sender: username,
-                    content: `${username} joined the chat`,
-                    chatRoomId: chatRoomId,
-                    timestamp: new Date().toISOString()
-                }));
-            }, (error) => {
-                console.error('STOMP connection error:', error);
-                displayMessage({ sender: 'System', content: `Connection failed: ${error}`, timestamp: new Date().toISOString() });
-                // Retry connection after 5 seconds
-                setTimeout(connectWebSocket, 5000);
-            });
+            stompClient.connect({}, () => {
+                showError('');
+                console.log('Connected to WebSocket');
+                document.getElementById('recipient').disabled = false;
+                document.getElementById('message').disabled = false;
+                document.getElementById('sendButton').disabled = false;
+                document.getElementById('isGroup').disabled = false;
+                document.getElementById('createGroupButton').disabled = false;
+                document.getElementById('username').disabled = true;
+                document.getElementById('password').disabled = true;
+                document.getElementById('email').disabled = true;
 
-            socket.onerror = (error) => {
-                console.error('SockJS error:', error);
-            };
+                stompClient.subscribe('/user/queue/private', (message) => {
+                    const msg = JSON.parse(message.body);
+                    console.log('Received private message:', msg);
+                    showMessage(msg, msg.senderId === currentUserId);
+                });
+
+                stompClient.subscribe('/user/queue/typing', (indicator) => {
+                    console.log('Received typing indicator:', indicator.body);
+                    showTyping(JSON.parse(indicator.body));
+                });
+
+                fetchUsersAndGroups();
+                fetch('/api/messages/history?userId=' + currentUserId)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Failed to fetch chat history: HTTP ' + response.status);
+                        }
+                        return response.json();
+                    })
+                    .then(messages => {
+                        console.log('Loaded chat history:', messages);
+                        messages.forEach(msg => showMessage(msg, msg.senderId === currentUserId));
+                    })
+                    .catch(error => {
+                        showError('Failed to load chat history: ' + error.message);
+                        console.error('Error fetching chat history:', error);
+                    });
+            }, (error) => {
+                showError('Connection failed: ' + error);
+                console.error('WebSocket connection failed:', error);
+                stompClient = null;
+                document.getElementById('username').disabled = false;
+                document.getElementById('password').disabled = false;
+                document.getElementById('email').disabled = false;
+                document.getElementById('recipient').disabled = true;
+                document.getElementById('message').disabled = true;
+                document.getElementById('sendButton').disabled = true;
+                document.getElementById('isGroup').disabled = true;
+                document.getElementById('createGroupButton').disabled = true;
+            });
+        }
+
+        function toggleGroupCreation() {
+            const groupCreationDiv = document.getElementById('groupCreation');
+            if (groupCreationDiv.style.display === 'none') {
+                groupCreationDiv.style.display = 'block';
+                fetchAvailableUsers();
+            } else {
+                groupCreationDiv.style.display = 'none';
+                document.getElementById('availableUsers').innerHTML = '<option value="" disabled>Select users (Hold Ctrl to select multiple)</option>';
+            }
+        }
+
+        function fetchAvailableUsers() {
+            console.log('Fetching available users for group creation');
+            fetch('/api/users/all')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch users: HTTP ' + response.status);
+                    }
+                    return response.json();
+                })
+                .then(users => {
+                    console.log('Received users for group creation:', users);
+                    const userSelect = document.getElementById('availableUsers');
+                    userSelect.innerHTML = '<option value="" disabled>Select users (Hold Ctrl to select multiple)</option>';
+                    if (users.length === 0) {
+                        showError('No users available. Please register users.');
+                        return;
+                    }
+                    users.forEach(user => {
+                        if (user.username && user.username !== currentUserId) {
+                            const option = document.createElement('option');
+                            option.value = user.username;
+                            option.textContent = user.username;
+                            userSelect.appendChild(option);
+                        }
+                    });
+                    if (userSelect.options.length === 1) {
+                        showError('No other users available. Please register more users.');
+                    } else {
+                        showError('');
+                    }
+                })
+                .catch(error => {
+                    showError('Failed to load users for group: ' + error.message);
+                    console.error('Error fetching users:', error);
+                });
+        }
+
+        function createGroup() {
+            const groupName = document.getElementById('groupName').value.trim();
+            const userSelect = document.getElementById('availableUsers');
+            const selectedUsers = Array.from(userSelect.selectedOptions).map(option => option.value);
+            selectedUsers.push(currentUserId);
+
+            if (!groupName) {
+                showError('Please enter a group name');
+                return;
+            }
+            if (selectedUsers.length === 0) {
+                showError('Please select at least one user for the group');
+                return;
+            }
+
+            fetch('/api/groups/create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ name: groupName, memberUsernames: selectedUsers })
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.text().then(text => {
+                            throw new Error(`Group creation failed: ${text} (HTTP ${response.status})`);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(group => {
+                    console.log('Group created successfully:', group);
+                    showError('');
+                    document.getElementById('groupCreation').style.display = 'none';
+                    document.getElementById('groupName').value = '';
+                    fetchUsersAndGroups();
+                })
+                .catch(error => {
+                    showError(error.message);
+                    console.error('Error creating group:', error);
+                });
+        }
+
+        function fetchUsersAndGroups() {
+            console.log('Fetching users and groups');
+            Promise.all([
+                fetch('/api/users/all').then(res => res.json()),
+                fetch('/api/groups/all').then(res => res.json())
+            ])
+                .then(([users, groups]) => {
+                    console.log('Received users:', users, 'groups:', groups);
+                    const recipientSelect = document.getElementById('recipient');
+                    recipientSelect.innerHTML = '<option value="">Select Recipient or Group</option>';
+
+                    users.forEach(user => {
+                        if (user.username && user.username !== currentUserId) {
+                            const option = document.createElement('option');
+                            option.value = user.username;
+                            option.textContent = user.username + ' (User)';
+                            option.dataset.type = 'user';
+                            recipientSelect.appendChild(option);
+                        }
+                    });
+
+                    console.log("hello",groups);
+
+                    groups.forEach(group => {
+                        if (group.memberUsernames.includes(currentUserId)) {
+                            const option = document.createElement('option');
+                            option.value = group.name;
+                            option.textContent = group.name + ' (Group)';
+                            option.dataset.type = 'group';
+                            recipientSelect.appendChild(option);
+                        }
+                    });
+
+                    if (recipientSelect.options.length === 1) {
+                        showError('No users or groups available. Please register users or create groups.');
+                    } else {
+                        showError('');
+                    }
+                })
+                .catch(error => {
+                    showError('Failed to load users or groups: ' + error.message);
+                    console.error('Error fetching users/groups:', error);
+                });
         }
 
         function sendMessage() {
-            const input = document.getElementById('message-input');
-            const content = input.value.trim();
-            if (!content || !stompClient) return;
+            if (!stompClient) {
+                showError('Please connect first');
+                return;
+            }
+            const recipient = document.getElementById('recipient').value;
+            const content = document.getElementById('message').value;
+            const selectedOption = document.getElementById('recipient').selectedOptions[0];
+            const isGroup = selectedOption && selectedOption.dataset.type === 'group';
+
+            if (!recipient || !content) {
+                showError('Please select a recipient or group and enter a message');
+                return;
+            }
 
             const message = {
-                type: 'MESSAGE',
-                sender: username,
+                senderId: currentUserId,
+                recipientId: isGroup ? null : recipient,
+                groupId: isGroup ? recipient : null,
                 content: content,
-                chatRoomId: chatRoomId,
-                timestamp: new Date().toISOString()
+                delivered: false,
+                read: false
             };
+            console.log('Sending message:', message);
 
-            stompClient.send(`/pub/chat/message`, {}, JSON.stringify(message));
-            input.value = '';
+            if (isGroup) {
+                stompClient.subscribe('/topic/group/' + recipient, (msg) => {
+                    const receivedMsg = JSON.parse(msg.body);
+                    console.log('Received group message:', receivedMsg);
+                    showMessage(receivedMsg, receivedMsg.senderId === currentUserId);
+                });
+                stompClient.send('/app/chat/group', {}, JSON.stringify(message));
+            } else {
+                stompClient.send('/app/chat/private', {}, JSON.stringify(message));
+            }
+            showMessage(message, true);
+            document.getElementById('message').value = '';
         }
 
-        function displayMessage(message) {
-            const messagesDiv = document.getElementById('messages');
-            const messageDiv = document.createElement('div');
-            messageDiv.classList.add('message', message.sender === username ? 'sent' : 'received');
-            const content = message.type === 'JOIN' ? `<i>${message.content}</i>` : message.content;
-            messageDiv.innerHTML = `
-                <div class="font-bold">${message.sender}</div>
-                <div>${content}</div>
-                <div class="text-xs text-gray-500">${new Date(message.timestamp).toLocaleTimeString()}</div>
-            `;
-            messagesDiv.appendChild(messageDiv);
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        function sendTyping() {
+            if (!stompClient) {
+                return;
+            }
+            const recipient = document.getElementById('recipient').value;
+            const selectedOption = document.getElementById('recipient').selectedOptions[0];
+            const isGroup = selectedOption && selectedOption.dataset.type === 'group';
+
+            if (!recipient) {
+                return;
+            }
+
+            const indicator = {
+                senderId: currentUserId,
+                recipientId: isGroup ? null : recipient,
+                groupId: isGroup ? recipient : null,
+                typing: true,
+                isGroup: isGroup
+            };
+            console.log('Sending typing indicator:', indicator);
+            stompClient.send('/app/chat/typing', {}, JSON.stringify(indicator));
+        }
+
+        function showMessage(message, isSent) {
+            const messages = document.getElementById('messages');
+            const div = document.createElement('div');
+            div.className = 'message ' + (isSent ? 'sent' : 'received');
+            const prefix = message.groupId ? `[${message.groupId}] ` : '';
+            div.textContent = `${prefix}${message.senderId}: ${message.content} ${message.delivered ? '[Delivered]' : ''} ${message.read ? '[Read]' : ''}`;
+            messages.appendChild(div);
+            messages.scrollTop = messages.scrollHeight;
+            if (!isSent && stompClient && message.id) {
+                console.log('Marking message as read:', message.id);
+                stompClient.send('/app/chat/read', {}, JSON.stringify(message.id));
+            }
+        }
+
+        function showTyping(indicator) {
+            const typing = document.getElementById('typing');
+            typing.textContent = indicator.typing ? `${indicator.senderId} is typing...` : '';
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
         }
     </script>
 </body>

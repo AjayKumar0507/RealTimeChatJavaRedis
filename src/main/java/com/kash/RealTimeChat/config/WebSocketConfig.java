@@ -1,10 +1,8 @@
 package com.kash.RealTimeChat.config;
 
 
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
@@ -13,38 +11,18 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
-    /**
-     *  Description:
-     *      - 메시지를 구독하는 요청의 prefix 를 /sub 으로 지정
-     *      - 메시지를 발행하는 요청의 prefix 를 /pub 으로 지정
-     *
-     */
     @Override
-    public void configureMessageBroker(MessageBrokerRegistry registry) {
-        registry.enableSimpleBroker("/sub");
-        registry.setApplicationDestinationPrefixes("/pub");
+    public void configureMessageBroker(MessageBrokerRegistry config) {
+        config.enableSimpleBroker("/topic", "/queue");
+        config.setApplicationDestinationPrefixes("/app");
     }
 
-    /**
-     *  Description:
-     *      - Stomp WebSocket 의 연결 엔드포인트 설정
-     *
-     */
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        registry
-                .addEndpoint("/ws/chat")
-                .setAllowedOrigins("http://localhost:8080")
+        registry.addEndpoint("/ws")
+                .setAllowedOrigins("https://cwave.netlify.com").
+                setAllowedOriginPatterns("*")
                 .withSockJS();
-    }
-    @Bean
-    public ThreadPoolTaskExecutor messageBrokerTaskExecutor() {
-        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(4);
-        executor.setMaxPoolSize(10);
-        executor.setQueueCapacity(100);
-        executor.setThreadNamePrefix("ws-broker-");
-        executor.initialize();
-        return executor;
+        System.out.println("WebSocket endpoint /chat registered");
     }
 }

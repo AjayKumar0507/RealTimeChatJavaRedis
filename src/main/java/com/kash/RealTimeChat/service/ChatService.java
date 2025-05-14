@@ -1,37 +1,44 @@
 package com.kash.RealTimeChat.service;
 
+import com.kash.RealTimeChat.model.Messages;
+import com.kash.RealTimeChat.repository.MessageRepository;
 
-import com.kash.RealTimeChat.redis.RedisSubscriber;
-import org.springframework.data.redis.listener.ChannelTopic;
-import org.springframework.data.redis.listener.RedisMessageListenerContainer;
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
-import java.util.HashMap;
-import java.util.Map;
 
 @Service
 public class ChatService {
 
-    private final RedisSubscriber redisSubscriber;  // 구독 처리 서비스
-    private final RedisMessageListenerContainer redisMessageListener;  // 채팅방(Topic)에 발행되는 메시지를 처리할 Listener(Subscriber)
-    private Map<Long, ChannelTopic> topics;
+    @Autowired
+    private MessageRepository messageRepository;
 
-    public ChatService(RedisSubscriber redisSubscriber, RedisMessageListenerContainer redisMessageListener) {
-        this.redisSubscriber = redisSubscriber;
-        this.redisMessageListener = redisMessageListener;
-        this.topics = new HashMap<>();
+    public void saveMessage(Messages message) {
+        System.out.println("Saving message: " + message);
+        messageRepository.save(message);
     }
 
-    /**
-     *  Description:
-     *      - Redis 에 Topic 을 만들고 pub/sub 통신을 하기 위해 Listener 를 설정
-     */
-    public void enterChatRoom(Long id) {
-        ChannelTopic topic = topics.get(id);
-        if (topic == null) {
-            topic = new ChannelTopic(id.toString());
-            redisMessageListener.addMessageListener(redisSubscriber, topic);
-            topics.put(id, topic);
-        }
+    public void updateMessageStatus(Messages message) {
+        System.out.println("Updating message status: " + message);
+        messageRepository.save(message);
     }
+
+    public void markMessageAsRead(String messageId) {
+        messageRepository.findById(messageId).ifPresent(message -> {
+            message.setRead(true);
+            messageRepository.save(message);
+            System.out.println("Message marked as read: " + messageId);
+        });
+    }
+
+    public List<Messages> getPrivateMessages(String senderId, String recipientId) {
+        return messageRepository.findPrivateMessagesBetweenUsers(senderId, recipientId);
+    }
+
+    public List<Messages> getGroupMessages(String groupId) {
+        return messageRepository.findByGroupId(groupId);
+    }
+
+
 }
