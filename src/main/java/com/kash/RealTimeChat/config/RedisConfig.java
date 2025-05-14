@@ -18,7 +18,7 @@ public class RedisConfig {
     @Bean
     public LettuceConnectionFactory redisConnectionFactory() {
         RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
-        config.setHostName("localhost");
+        config.setHostName("https://cwave.netlify.com");
         config.setPort(6379);
         // config.setPassword(RedisPassword.of("your-redis-password")); // Uncomment if password is required
         return new LettuceConnectionFactory(config);
